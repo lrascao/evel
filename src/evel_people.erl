@@ -131,7 +131,7 @@ handle_inquire_voters({ElectionId, From, VoterCount, DoMonitor}, State) ->
 
 -spec handle_join({pid(), evel_voter:voter(), boolean()}, #?STATE{}) -> {noreply, #?STATE{}}.
 handle_join({Sender, Voter, NeedAck}, State) ->
-    case maps:is_key(Voter, hash_ring:get_nodes(State#?STATE.people)) of
+    case is_key_node(Voter, hash_ring:get_node_list(State#?STATE.people)) of
         true  -> {noreply, State};
         false ->
             _ = monitor(process, Voter),
@@ -145,7 +145,7 @@ handle_join({Sender, Voter, NeedAck}, State) ->
 handle_down(Pid, State) ->
     People0 = State#?STATE.people,
     People1 =
-        case maps:is_key(Pid, hash_ring:get_nodes(People0)) of
+        case is_key_node(Pid, hash_ring:get_node_list(People0)) of
             false -> People0;
             true  ->
                 ok = notify_change({'PERSON_LEAVE', Pid}, State),
@@ -172,3 +172,14 @@ join(Node, Voter) ->
 -spec join_ack(pid(), evel_voter:voter()) -> ok.
 join_ack(Pid, Voter) ->
     gen_server:cast(Pid, {join, {self(), Voter, false}}).
+
+-spec is_key_node(evel_voter:voter(), [hash_ring_node:ring_node()]) -> boolean().
+is_key_node(_, []) -> false;
+is_key_node(Key, [Node | Rest]) ->
+    case hash_ring_node:get_key(Node) =:= Key of 
+        true ->
+            true;
+        false ->
+            is_key_node(Key, Rest)
+    end.
+
